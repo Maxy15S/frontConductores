@@ -1,31 +1,27 @@
-# Etapa de construcción
+# Build stage
 FROM node:20-alpine as build
 
 WORKDIR /app
-
-# Copiar archivos de configuración
 COPY package*.json ./
-
-# Instalar dependencias
 RUN npm install
-
-# Copiar el código fuente
 COPY . .
-
-# Construir la aplicación
 RUN npm run build
 
-# Etapa de producción
+# Production stage
 FROM nginx:alpine
 
-# Copiar la configuración de nginx
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Copiar los archivos construidos desde la etapa anterior
+# Copy built assets from build stage
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Exponer el puerto 80
-EXPOSE 80
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Iniciar nginx
-CMD ["nginx", "-g", "daemon off;"] 
+# Create entrypoint script
+RUN echo '#!/bin/sh' > /docker-entrypoint.sh && \
+    echo 'sed -i "s/\$PORT/${PORT:-8080}/g" /etc/nginx/conf.d/default.conf' >> /docker-entrypoint.sh && \
+    echo 'nginx -g "daemon off;"' >> /docker-entrypoint.sh && \
+    chmod +x /docker-entrypoint.sh
+
+EXPOSE 8080
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
